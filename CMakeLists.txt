@@ -30,17 +30,19 @@ endif()
 #[[perl
 #  return "keep" if $ENV{USER} ne "tb";
 #  use POSIX qw(strftime);
-#  my $date = strftime("%Y%m%d", localtime);
 #  open(F, "tlx/version.hpp") or die;
-#  my @lines = grep(m/^#define TLX_MINOR_VERSION /, <F>);
+#  my $lines = join("", <F>);
 #  close(F);
-#  die unless @lines == 1;
-#  $lines[0] =~ m/TLX_MINOR_VERSION\s+([0-9]+)/;
-#  print("set(TLX_VERSION \"0.$1.$date\")\n");
+#  $lines =~ m/TLX_MINOR_VERSION\s+([0-9]+)/;
+#  my $minor_ver = $1;
+#  $lines =~ m/TLX_PATCH_VERSION\s+([0-9]+)/;
+#  my $patch_ver = $1;
+#  print("set(TLX_VERSION \"0.$minor_ver.$patch_ver\")\n");
+#  print("set(TLX_SOVERSION \"0.$minor_ver\")\n");
 #]]
-set(TLX_VERSION "0.5.20210401")
+set(TLX_VERSION "0.6.1")
+set(TLX_SOVERSION "0.6")
 #[[end]]
-set(TLX_SOVERSION "0")
 
 ################################################################################
 ### Options and Switches
@@ -56,6 +58,9 @@ option(TLX_TRY_COMPILE_HEADERS
 
 option(TLX_MORE_TESTS
   "Run more extensive test." OFF)
+
+option(TLX_WARNINGS_ARE_ERRORS
+  "Compile with flags such that warnings are error." OFF)
 
 ### building shared and/or static libraries
 
@@ -103,32 +108,41 @@ if(NOT MSVC)
   ### Linux/Unix-like Build Environment ########################################
 
   # enable warnings
-  set(CMAKE_CXX_FLAGS "-g -W -Wall -Wextra -fPIC ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-W -Wall -Wextra -fPIC ${CMAKE_CXX_FLAGS}")
 
   # test availability of -std=c++XX version
   include(CheckCXXCompilerFlag)
 
-  check_cxx_compiler_flag("-std=c++17" TLX_CXX_HAS_CXX17)
-  if(TLX_CXX_HAS_CXX17)
-    set(CMAKE_CXX_FLAGS "-std=c++17 ${CMAKE_CXX_FLAGS}")
+  check_cxx_compiler_flag("-std=c++20" TLX_CXX_HAS_CXX20)
+  if(TLX_CXX_HAS_CXX20)
+    set(CMAKE_CXX_FLAGS "-std=c++20 ${CMAKE_CXX_FLAGS}")
+    set(TLX_CXX_HAS_CXX17 ON)
     set(TLX_CXX_HAS_CXX14 ON)
     set(TLX_CXX_HAS_CXX11 ON)
     set(TLX_CXX_HAS_CXX0X ON)
   else()
-    check_cxx_compiler_flag("-std=c++14" TLX_CXX_HAS_CXX14)
-    if(TLX_CXX_HAS_CXX14)
-      set(CMAKE_CXX_FLAGS "-std=c++14 ${CMAKE_CXX_FLAGS}")
+    check_cxx_compiler_flag("-std=c++17" TLX_CXX_HAS_CXX17)
+    if(TLX_CXX_HAS_CXX17)
+      set(CMAKE_CXX_FLAGS "-std=c++17 ${CMAKE_CXX_FLAGS}")
+      set(TLX_CXX_HAS_CXX14 ON)
       set(TLX_CXX_HAS_CXX11 ON)
       set(TLX_CXX_HAS_CXX0X ON)
     else()
-      check_cxx_compiler_flag("-std=c++11" TLX_CXX_HAS_CXX11)
-      if(TLX_CXX_HAS_CXX11)
-        set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
+      check_cxx_compiler_flag("-std=c++14" TLX_CXX_HAS_CXX14)
+      if(TLX_CXX_HAS_CXX14)
+        set(CMAKE_CXX_FLAGS "-std=c++14 ${CMAKE_CXX_FLAGS}")
+        set(TLX_CXX_HAS_CXX11 ON)
         set(TLX_CXX_HAS_CXX0X ON)
       else()
-        check_cxx_compiler_flag("-std=c++0x" TLX_CXX_HAS_CXX0X)
-        if(TLX_CXX_HAS_CXX0X)
-          set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS}")
+        check_cxx_compiler_flag("-std=c++11" TLX_CXX_HAS_CXX11)
+        if(TLX_CXX_HAS_CXX11)
+          set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
+          set(TLX_CXX_HAS_CXX0X ON)
+        else()
+          check_cxx_compiler_flag("-std=c++0x" TLX_CXX_HAS_CXX0X)
+          if(TLX_CXX_HAS_CXX0X)
+            set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS}")
+          endif()
         endif()
       endif()
     endif()
@@ -163,6 +177,10 @@ if(NOT MSVC)
 
   # enable STL debug
   #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_DEBUG")
+
+  if(TLX_WARNINGS_ARE_ERRORS)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+  endif()
 
   # enable extra warnings on gcc
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
